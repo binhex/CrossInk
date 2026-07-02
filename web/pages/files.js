@@ -419,8 +419,17 @@
 
     const folderInput = document.getElementById('folderInput');
     // Use original dropped files if available (preserves webkitRelativePath)
-    const files = droppedFolderFiles || folderInput.files;
-    if (files.length === 0) return;
+    // droppedFolderFiles is [{file, relPath}] format; folderInput.files is FileList
+    let fileEntries;
+    let isDropFiles;
+    if (droppedFolderFiles) {
+      fileEntries = droppedFolderFiles;
+      isDropFiles = true;
+    } else {
+      fileEntries = folderInput.files;
+      isDropFiles = false;
+    }
+    if (fileEntries.length === 0) return;
 
     const uploadBtn = document.getElementById('uploadBtn');
     const progressContainer = document.getElementById('progress-container');
@@ -437,8 +446,9 @@
 
     // Step 1: Collect unique parent directories (relative to selected folder root)
     const dirs = new Set();
-    for (const file of files) {
-      const parts = file.webkitRelativePath.split('/');
+    for (const entry of fileEntries) {
+      const relPath = isDropFiles ? entry.relPath : entry.webkitRelativePath;
+      const parts = relPath.split('/');
       parts.pop(); // Remove filename
       let dirPath = '';
       for (const part of parts) {
@@ -476,10 +486,11 @@
     // The multipart filename is used as-is by the server — do NOT include filename in path
     let uploaded = 0;
     let failed = 0;
-    const total = files.length;
+    const total = fileEntries.length;
 
-    for (const file of files) {
-      const relPath = file.webkitRelativePath;
+    for (const entry of fileEntries) {
+      const file = isDropFiles ? entry.file : entry;
+      const relPath = isDropFiles ? entry.relPath : entry.webkitRelativePath;
       const lastSlash = relPath.lastIndexOf('/');
       const parentDir = lastSlash >= 0 ? relPath.substring(0, lastSlash) : '';
       const uploadPath = currentPath + (currentPath.endsWith('/') ? '' : '/') + parentDir;
@@ -530,6 +541,87 @@
       closeUploadModal();
       window.location.reload();
     }, 1500);
+  }
+
+  /**
+   * Recursively walk a FileSystemDirectoryEntry from a drag-and-drop,
+   * collecting {file, relPath} pairs. DataTransfer.files does NOT carry
+   * webkitRelativePath for drag-and-drop — only <input webkitdirectory> does.
+   */
+  async function walkDroppedFolder(dirEntry) {
+    const results = [];
+    async function walk(entry) {
+      if (entry.isFile) {
+        const file = await new Promise((resolve, reject) => entry.file(resolve));
+        // entry.fullPath is like '/MyFolder/sub/file.txt' — strip leading '/'
+        results.push({ file, relPath: entry.fullPath.replace(/^\//, '') });
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        // readEntries may need multiple calls if directory has >100 entries
+        let childEntries;
+        do {
+          childEntries = await new Promise(resolve => reader.readEntries(resolve));
+          for (const child of childEntries) {
+            await walk(child);
+          }
+        } while (childEntries.length > 0);
+      }
+    }
+    await walk(dirEntry);
+    return results;
+  }
+
+  /**
+   * Render a folder tree preview from [{file, relPath}, ...] array
+   * (same structure as droppedFolderFiles from walkDroppedFolder).
+   */
+  function renderDroppedFolderTree(fileEntries) {
+    const treeContent = document.getElementById('folderTreeContent');
+    const treeCount = document.getElementById('folderTreeCount');
+    const FILES_KEY = '\x00files';
+
+    const tree = {};
+    let fileCount = 0;
+    let dirCount = 0;
+
+    for (const entry of fileEntries) {
+      const parts = entry.relPath.split('/');
+      let node = tree;
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (i === parts.length - 1) {
+          if (!node[FILES_KEY]) node[FILES_KEY] = [];
+          node[FILES_KEY].push(part);
+          fileCount++;
+        } else {
+          if (!node[part]) {
+            node[part] = {};
+            dirCount++;
+          }
+          node = node[part];
+        }
+      }
+    }
+
+    function renderNode(node, depth) {
+      let html = '';
+      for (const [name, child] of Object.entries(node)) {
+        if (name === FILES_KEY) continue;
+        html += `<div style="padding-left:${depth * 16}px;color:#2ecc71;">📁 ${escapeHtml(name)}/</div>`;
+        html += renderNode(child, depth + 1);
+      }
+      if (node[FILES_KEY]) {
+        for (const fname of node[FILES_KEY]) {
+          html += `<div style="padding-left:${(depth + 1) * 16}px;color:#ccc;">📄 ${escapeHtml(fname)}</div>`;
+        }
+      }
+      return html;
+    }
+
+    const rootName = fileEntries[0].relPath.split('/')[0];
+    const rootNode = tree[rootName] || {};
+    treeContent.innerHTML = `<div style="font-weight:600;margin-bottom:4px;color:#f9ca24;">📁 ${escapeHtml(rootName)}/</div>` + renderNode(rootNode, 1);
+    treeCount.textContent = `${dirCount} folder${dirCount !== 1 ? 's' : ''}, ${fileCount} file${fileCount !== 1 ? 's' : ''}`;
   }
 
   function updateBatchModeUI(isBatch) {
@@ -1476,7 +1568,7 @@
         if (dragDepth === 0) dropZone.classList.remove('dragover');
       });
 
-      dropZone.addEventListener('drop', function(e) {
+      dropZone.addEventListener('drop', async function(e) {
         e.preventDefault();
         dragDepth = 0;
         dropZone.classList.remove('dragover');
@@ -1487,26 +1579,30 @@
 
         // Detect if a folder was dropped using DataTransferItem API
         let isFolderDrop = false;
+        let rootEntry = null;
         if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
           const firstItem = e.dataTransfer.items[0];
           if (firstItem.webkitGetAsEntry) {
             const entry = firstItem.webkitGetAsEntry();
             isFolderDrop = entry && entry.isDirectory;
+            rootEntry = entry;
           }
         }
 
-        if (isFolderDrop) {
-          // Store original dropped files (DataTransfer clone strips webkitRelativePath)
-          droppedFolderFiles = Array.from(dropped);
+        if (isFolderDrop && rootEntry) {
+          // Walk directory tree via webkitGetAsEntry (DataTransfer.files does NOT
+          // carry webkitRelativePath for drag-and-drop — only <input webkitdirectory> does)
+          const fileEntries = await walkDroppedFolder(rootEntry);
+          droppedFolderFiles = fileEntries;
           // Clear file selection state
-          const fileInput = document.getElementById('fileInput');
-          fileInput.value = '';
-          fileInput.classList.remove('has-files');
+          const fileInputEl = document.getElementById('fileInput');
+          fileInputEl.value = '';
+          fileInputEl.classList.remove('has-files');
           document.getElementById('convertOptions').style.display = 'none';
           clearImagePicker();
           document.getElementById('browseLinks').style.display = 'none';
-          // Show folder tree with original files (preserves directory paths)
-          renderFolderTree(droppedFolderFiles);
+          // Show folder tree using path data
+          renderDroppedFolderTree(droppedFolderFiles);
           document.getElementById('folderTreePreview').style.display = 'block';
           document.getElementById('uploadBtn').disabled = false;
           document.getElementById('uploadBtn').textContent = 'Upload';
