@@ -552,7 +552,7 @@
     const results = [];
     async function walk(entry) {
       if (entry.isFile) {
-        const file = await new Promise((resolve, reject) => entry.file(resolve));
+        const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
         // entry.fullPath is like '/MyFolder/sub/file.txt' — strip leading '/'
         results.push({ file, relPath: entry.fullPath.replace(/^\//, '') });
       } else if (entry.isDirectory) {
@@ -560,7 +560,7 @@
         // readEntries may need multiple calls if directory has >100 entries
         let childEntries;
         do {
-          childEntries = await new Promise(resolve => reader.readEntries(resolve));
+          childEntries = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
           for (const child of childEntries) {
             await walk(child);
           }
@@ -578,6 +578,13 @@
   function renderDroppedFolderTree(fileEntries) {
     const treeContent = document.getElementById('folderTreeContent');
     const treeCount = document.getElementById('folderTreeCount');
+
+    if (!fileEntries || fileEntries.length === 0) {
+      treeContent.innerHTML = '<div style="color:#888;">(empty folder)</div>';
+      treeCount.textContent = '0 folders, 0 files';
+      return;
+    }
+
     const FILES_KEY = '\x00files';
 
     const tree = {};
@@ -1574,10 +1581,9 @@
         dropZone.classList.remove('dragover');
         if (uploadBusy()) return;
 
-        const dropped = e.dataTransfer && e.dataTransfer.files;
-        if (!dropped || dropped.length === 0) return;
-
-        // Detect if a folder was dropped using DataTransferItem API
+        // Detect folder drop FIRST — DataTransfer.files may be empty for
+        // directory drops in some browsers/contexts, but webkitGetAsEntry
+        // always works for folder detection.
         let isFolderDrop = false;
         let rootEntry = null;
         if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
@@ -1590,29 +1596,39 @@
         }
 
         if (isFolderDrop && rootEntry) {
-          // Walk directory tree via webkitGetAsEntry (DataTransfer.files does NOT
-          // carry webkitRelativePath for drag-and-drop — only <input webkitdirectory> does)
-          const fileEntries = await walkDroppedFolder(rootEntry);
-          droppedFolderFiles = fileEntries;
-          // Clear file selection state
-          const fileInputEl = document.getElementById('fileInput');
-          fileInputEl.value = '';
-          fileInputEl.classList.remove('has-files');
-          document.getElementById('convertOptions').style.display = 'none';
-          clearImagePicker();
-          document.getElementById('browseLinks').style.display = 'none';
-          // Show folder tree using path data
-          renderDroppedFolderTree(droppedFolderFiles);
-          document.getElementById('folderTreePreview').style.display = 'block';
-          document.getElementById('uploadBtn').disabled = false;
-          document.getElementById('uploadBtn').textContent = 'Upload';
-          document.getElementById('uploadBtn').classList.remove('optimize');
-        } else {
-          const dt = new DataTransfer();
-          for (const file of dropped) dt.items.add(file);
-          fileInput.files = dt.files;
-          validateFile();
+          try {
+            // Walk directory tree via webkitGetAsEntry (DataTransfer.files does NOT
+            // carry webkitRelativePath for drag-and-drop — only <input webkitdirectory> does)
+            const fileEntries = await walkDroppedFolder(rootEntry);
+            droppedFolderFiles = fileEntries;
+            // Clear file selection state
+            const fileInputEl = document.getElementById('fileInput');
+            fileInputEl.value = '';
+            fileInputEl.classList.remove('has-files');
+            document.getElementById('convertOptions').style.display = 'none';
+            clearImagePicker();
+            document.getElementById('browseLinks').style.display = 'none';
+            // Show folder tree using path data
+            renderDroppedFolderTree(droppedFolderFiles);
+            document.getElementById('folderTreePreview').style.display = 'block';
+            document.getElementById('uploadBtn').disabled = false;
+            document.getElementById('uploadBtn').textContent = 'Upload';
+            document.getElementById('uploadBtn').classList.remove('optimize');
+          } catch (err) {
+            console.error('Folder drop walk failed:', err);
+            droppedFolderFiles = null;
+          }
+          return;
         }
+
+        // Handle file drop
+        const dropped = e.dataTransfer && e.dataTransfer.files;
+        if (!dropped || dropped.length === 0) return;
+
+        const dt = new DataTransfer();
+        for (const file of dropped) dt.items.add(file);
+        fileInput.files = dt.files;
+        validateFile();
       });
     }
   })();
