@@ -318,6 +318,7 @@
     // Update converter variables
     updateQualitySettings();
     // Reset upload state
+    droppedFolderFiles = null;
     document.getElementById('folderInput').value = '';
     document.getElementById('folderTreePreview').style.display = 'none';
     document.getElementById('dropZoneHint').textContent = '⬇ Drag a file or folder here — or click to browse';
@@ -406,12 +407,17 @@
     treeCount.textContent = `${dirCount} folder${dirCount !== 1 ? 's' : ''}, ${fileCount} file${fileCount !== 1 ? 's' : ''}`;
   }
 
+  // Stores files from drag-and-drop folder (DataTransfer clone strips webkitRelativePath,
+  // so we keep the originals here for rendering and upload)
+  let droppedFolderFiles = null;
+
   async function uploadFolderContents() {
     // Re-entrancy guard — prevent concurrent uploads
     if (isUploadInProgress) return;
 
     const folderInput = document.getElementById('folderInput');
-    const files = folderInput.files;
+    // Use original dropped files if available (preserves webkitRelativePath)
+    const files = droppedFolderFiles || folderInput.files;
     if (files.length === 0) return;
 
     const uploadBtn = document.getElementById('uploadBtn');
@@ -1488,10 +1494,21 @@
         }
 
         if (isFolderDrop) {
-          const dt = new DataTransfer();
-          for (const file of dropped) dt.items.add(file);
-          document.getElementById('folderInput').files = dt.files;
-          validateFolder();
+          // Store original dropped files (DataTransfer clone strips webkitRelativePath)
+          droppedFolderFiles = Array.from(dropped);
+          // Clear file selection state
+          const fileInput = document.getElementById('fileInput');
+          fileInput.value = '';
+          fileInput.classList.remove('has-files');
+          document.getElementById('convertOptions').style.display = 'none';
+          clearImagePicker();
+          document.getElementById('browseLinks').style.display = 'none';
+          // Show folder tree with original files (preserves directory paths)
+          renderFolderTree(droppedFolderFiles);
+          document.getElementById('folderTreePreview').style.display = 'block';
+          document.getElementById('uploadBtn').disabled = false;
+          document.getElementById('uploadBtn').textContent = 'Upload';
+          document.getElementById('uploadBtn').classList.remove('optimize');
         } else {
           const dt = new DataTransfer();
           for (const file of dropped) dt.items.add(file);
