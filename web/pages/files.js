@@ -326,6 +326,8 @@
   }
 
   function validateFolder() {
+    // User browsed for a folder — clear any stale drag-and-drop state
+    droppedFolderFiles = null;
     const folderInput = document.getElementById('folderInput');
     const files = folderInput.files;
     const uploadBtn = document.getElementById('uploadBtn');
@@ -1520,6 +1522,8 @@
   })();
 
   function validateFile() {
+    // User selected files — clear any stale folder drop state
+    droppedFolderFiles = null;
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     const files = fileInput.files;
@@ -3610,8 +3614,8 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 }
 
 function uploadFile() {
-  // Auto-detect: if folder input has files, use folder upload
-  if (document.getElementById('folderInput').files.length > 0) {
+  // Auto-detect: if folder input has files or we have dragged-and-dropped folder files, use folder upload
+  if (document.getElementById('folderInput').files.length > 0 || droppedFolderFiles) {
     return uploadFolderContents();
   }
   if (isUploadInProgress) return;
