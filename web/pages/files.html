@@ -45,8 +45,8 @@
         <input type="file" id="folderInput" webkitdirectory onchange="validateFolder()" style="display:none;">
         <p class="drop-zone-hint" id="dropZoneHint">⬇ Drop files here — or click to browse</p>
         <div class="upload-mode-buttons">
-          <button type="button" class="mode-btn active" id="fileModeBtn" onclick="setUploadMode('file')">📄 Select Files</button>
-          <button type="button" class="mode-btn" id="folderModeBtn" onclick="setUploadMode('folder')">📁 Select Folder</button>
+          <button type="button" class="mode-btn active" id="fileModeBtn" onclick="setUploadMode('file');document.getElementById('fileInput').click()">📄 Select Files</button>
+          <button type="button" class="mode-btn" id="folderModeBtn" onclick="setUploadMode('folder');document.getElementById('folderInput').click()">📁 Select Folder</button>
         </div>
       </div>
       <!-- Upload mode indicator -->

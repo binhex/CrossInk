@@ -358,8 +358,6 @@
       uploadBtn.classList.remove('optimize');
       // Clear folder selection
       folderInput.value = '';
-      // Open the file picker
-      fileInput.click();
     } else {
       folderModeBtn.classList.add('active');
       fileModeBtn.classList.remove('active');
@@ -374,8 +372,6 @@
       fileInput.value = '';
       fileInput.classList.remove('has-files');
       clearImagePicker();
-      // Open the folder picker
-      folderInput.click();
     }
     uploadBtn.disabled = true;
   }
