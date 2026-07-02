@@ -1,4 +1,12 @@
-> **This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** with a focus on improved fonts and minimal reading stats.
+> **This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** with a focus on improved fonts, reading stats, and enhanced web file management.
+
+## Web UI Enhancements
+
+The built-in web file manager (available while the device is in File Transfer mode) includes several quality-of-life improvements over upstream:
+
+- **Recursive folder delete** — Delete a folder and all its contents (files and subfolders) in one action. A checkbox in the delete confirmation modal enables recursive deletion when folders are selected.
+- **Folder upload** — Upload an entire folder from your computer, preserving its directory structure on the SD card. Click the drop zone to browse for files or folders, or drag-and-drop — the browser auto-detects what you're uploading.
+- **Simplified upload UI** — A single clean drop zone replaces the multiple button layout. Click to see inline browse choices (files or folder), or drag-and-drop directly.
 
 ## What's different in this fork
 
@@ -144,6 +152,8 @@ pio run -e tiny --target upload
 ```
 
 Replace `tiny` with another build variant if needed. See [Font Build Variants](./docs/font-build-variants.md).
+
+> **Fork-friendly CI**: This fork includes a `.github/workflows/build-firmware.yml` workflow that builds firmware on GitHub's standard `ubuntu-latest` runners — no self-hosted runner required. Push to `main` and download the `firmware-tiny` artifact from Actions.
 
 See [Testing and Debugging](./docs/contributing/testing-debugging.md) for serial logging, simulator checks, static analysis, and bug-report guidance.
 
