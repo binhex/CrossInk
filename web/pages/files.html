@@ -42,7 +42,22 @@
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
       <div class="drop-zone" id="dropZone">
         <input type="file" id="fileInput" onchange="validateFile()" multiple>
-        <p class="drop-zone-hint">⬇ Drop files here — or click to browse</p>
+        <input type="file" id="folderInput" webkitdirectory onchange="validateFolder()" style="display:none;">
+        <p class="drop-zone-hint" id="dropZoneHint">⬇ Drop files here — or click to browse</p>
+        <div class="upload-mode-buttons">
+          <button type="button" class="mode-btn active" id="fileModeBtn" onclick="setUploadMode('file')">📄 Select Files</button>
+          <button type="button" class="mode-btn" id="folderModeBtn" onclick="setUploadMode('folder')">📁 Select Folder</button>
+        </div>
+      </div>
+      <!-- Upload mode indicator -->
+      <div class="upload-mode-indicator" id="uploadModeIndicator" style="display:block;">
+        Mode: <span id="uploadModeLabel">Files</span> — <span id="uploadModeSuffix">EPUB optimization available</span>
+      </div>
+      <!-- Folder tree preview -->
+      <div class="folder-tree-preview" id="folderTreePreview" style="display:none;">
+        <div class="folder-tree-header">📂 Folder Structure</div>
+        <div id="folderTreeContent"></div>
+        <div class="folder-tree-count" id="folderTreeCount"></div>
       </div>
       <div class="picker-columns" id="pickerColumns">
         <div class="convert-options" id="convertOptions" style="display:none;">
@@ -232,6 +247,16 @@
       <p class="delete-warning">⚠️ This action cannot be undone!</p>
       <p class="file-info">Are you sure you want to delete the following item(s)?</p>
       <div id="deleteItemList" style="max-height:240px; overflow:auto; margin-bottom:10px;"></div>
+      <!-- Recursive delete option — hidden when only files selected -->
+      <div id="recursiveDeleteOption" style="display:none; background:rgba(243,156,18,0.13); border:1px solid #f39c12; border-radius:4px; padding:10px; margin-bottom:14px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.92em;">
+          <input type="checkbox" id="recursiveDeleteCheckbox" style="accent-color:#f39c12; width:16px; height:16px;">
+          <span>Delete folder contents recursively</span>
+        </label>
+        <p style="color:#f39c12; font-size:0.82em; margin:6px 0 0 24px;">
+          All files and subfolders inside selected folders will be permanently deleted.
+        </p>
+      </div>
       <button class="delete-btn-confirm" onclick="confirmDelete()">Delete</button>
       <button class="delete-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
     </div>

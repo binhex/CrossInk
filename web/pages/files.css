@@ -1423,3 +1423,78 @@ h2 {
 .log-summary-table .increased {
       color: #f39c12;
     }
+
+/* Upload mode buttons inside drop zone */
+.upload-mode-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+.mode-btn {
+  padding: 6px 16px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #95a5a6;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+}
+.mode-btn:hover {
+  border-color: #777;
+  color: #ccc;
+}
+.mode-btn.active {
+  border-color: #3498db;
+  background: #3498db22;
+  color: #3498db;
+  font-weight: 600;
+}
+
+/* Upload mode indicator */
+.upload-mode-indicator {
+  font-size: 0.82em;
+  color: #95a5a6;
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 6px;
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+/* Folder tree preview */
+.folder-tree-preview {
+  background: #1a1a1a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  max-height: 200px;
+  overflow: auto;
+  font-family: monospace;
+  font-size: 0.82em;
+}
+.folder-tree-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #3498db;
+}
+#folderTreeContent {
+  color: #ccc;
+  line-height: 1.8;
+}
+.folder-tree-count {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #333;
+  font-size: 0.9em;
+  color: #777;
+}
+
+/* Recursive delete checkbox area */
+#recursiveDeleteOption label {
+  color: #f39c12;
+}
+#recursiveDeleteOption label input[type="checkbox"] {
+  accent-color: #f39c12;
+}

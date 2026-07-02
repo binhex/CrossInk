@@ -1091,19 +1091,39 @@ void CrossPointWebServer::handleDelete() const {
 
     // Decide whether it's a directory or file by opening it
     bool success = false;
+    bool recursive = server->hasArg("recursive") && server->arg("recursive") == "true";
     HalFile f = Storage.open(itemPath.c_str());
     if (f && f.isDirectory()) {
-      // For folders, ensure empty before removing
-      HalFile entry = f.openNextFile();
-      if (entry) {
-        entry.close();
-        f.close();
-        failedItems += itemPath + " (folder not empty); ";
-        allSuccess = false;
-        continue;
-      }
       f.close();
-      success = Storage.rmdir(itemPath.c_str());
+      if (recursive) {
+        // Recursive delete — remove directory and all contents.
+        // Storage.removeDir() delegates to SDCardManager::removeDir() which
+        // performs a recursive tree removal.
+        // NOTE: Book cache entries (/.crosspoint/) for EPUBs inside this
+        // directory are intentionally NOT cleared here. Recursive metadata
+        // path collection would require scanning the entire directory tree
+        // in the HTTP handler, which is expensive on ESP32-C3 RAM. The
+        // device-local FileBrowserActivity handles this via
+        // collectMetadataPathsRecursively when deleting from the device UI.
+        // Orphaned cache entries are harmless and cleaned up by periodic
+        // maintenance or on next device boot.
+        success = Storage.removeDir(itemPath.c_str());
+      } else {
+        // Non-recursive: ensure folder is empty before removing
+        HalFile check = Storage.open(itemPath.c_str());
+        if (check) {
+          HalFile entry = check.openNextFile();
+          if (entry) {
+            entry.close();
+            check.close();
+            failedItems += itemPath + " (folder not empty); ";
+            allSuccess = false;
+            continue;
+          }
+          check.close();
+        }
+        success = Storage.rmdir(itemPath.c_str());
+      }
     } else {
       // It's a file (or couldn't open as dir) — remove file
       if (f) f.close();

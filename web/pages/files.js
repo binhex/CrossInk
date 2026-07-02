@@ -26,6 +26,7 @@
   console.log('[Network] Initial status:', isNetworkOnline ? 'online' : 'offline');
 
   function escapeHtml(unsafe) {
+    if (!unsafe) return '';
     return unsafe
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -316,6 +317,251 @@
     setOverlap(5);
     // Update converter variables
     updateQualitySettings();
+    // Reset folder upload state
+    uploadMode = 'file';
+    document.getElementById('folderInput').value = '';
+    document.getElementById('folderTreePreview').style.display = 'none';
+    document.getElementById('fileModeBtn').classList.add('active');
+    document.getElementById('folderModeBtn').classList.remove('active');
+    document.getElementById('dropZoneHint').textContent = '⬇ Drop files here — or click to browse';
+    document.getElementById('uploadModeIndicator').innerHTML = 'Mode: <span id="uploadModeLabel">Files</span> — <span id="uploadModeSuffix">EPUB optimization available</span>';
+  }
+
+  // Upload mode state
+  let uploadMode = 'file'; // 'file' or 'folder'
+
+  function setUploadMode(mode) {
+    uploadMode = mode;
+    const fileModeBtn = document.getElementById('fileModeBtn');
+    const folderModeBtn = document.getElementById('folderModeBtn');
+    const fileInput = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
+    const dropZoneHint = document.getElementById('dropZoneHint');
+    const modeLabel = document.getElementById('uploadModeLabel');
+    const modeSuffix = document.getElementById('uploadModeSuffix');
+    const folderTreePreview = document.getElementById('folderTreePreview');
+    const convertOptions = document.getElementById('convertOptions');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    if (mode === 'file') {
+      fileModeBtn.classList.add('active');
+      folderModeBtn.classList.remove('active');
+      dropZoneHint.textContent = '⬇ Drop files here — or click to browse';
+      modeLabel.textContent = 'Files';
+      modeSuffix.textContent = 'EPUB optimization available';
+      folderTreePreview.style.display = 'none';
+      // Show EPUB optimization options when files are selected
+      if (fileInput.files.length > 0) {
+        convertOptions.style.display = 'block';
+      }
+      uploadBtn.textContent = 'Upload';
+      uploadBtn.classList.remove('optimize');
+      // Clear folder selection
+      folderInput.value = '';
+    } else {
+      folderModeBtn.classList.add('active');
+      fileModeBtn.classList.remove('active');
+      dropZoneHint.textContent = '📁 Drop a folder here — or click to browse';
+      modeLabel.textContent = 'Folder';
+      modeSuffix.textContent = 'structure will be preserved';
+      // Hide EPUB optimization for folder uploads
+      convertOptions.style.display = 'none';
+      uploadBtn.textContent = 'Upload Folder';
+      uploadBtn.classList.add('optimize');
+      // Clear file selection
+      fileInput.value = '';
+      fileInput.classList.remove('has-files');
+      clearImagePicker();
+    }
+    uploadBtn.disabled = true;
+  }
+
+  function validateFolder() {
+    const folderInput = document.getElementById('folderInput');
+    const files = folderInput.files;
+    const uploadBtn = document.getElementById('uploadBtn');
+    const folderTreePreview = document.getElementById('folderTreePreview');
+
+    if (files.length === 0) {
+      folderTreePreview.style.display = 'none';
+      uploadBtn.disabled = true;
+      return;
+    }
+
+    renderFolderTree(files);
+    folderTreePreview.style.display = 'block';
+    uploadBtn.disabled = false;
+  }
+
+  function renderFolderTree(files) {
+    const treeContent = document.getElementById('folderTreeContent');
+    const treeCount = document.getElementById('folderTreeCount');
+
+    // Use a distinct sentinel key to avoid collision with real directory names
+    const FILES_KEY = '\x00files';
+
+    // Build a tree structure from webkitRelativePath
+    const tree = {};
+    let fileCount = 0;
+    let dirCount = 0;
+
+    for (const file of files) {
+      const parts = file.webkitRelativePath.split('/');
+      let node = tree;
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (i === parts.length - 1) {
+          if (!node[FILES_KEY]) node[FILES_KEY] = [];
+          node[FILES_KEY].push(part);
+          fileCount++;
+        } else {
+          if (!node[part]) {
+            node[part] = {};
+            dirCount++;
+          }
+          node = node[part];
+        }
+      }
+    }
+
+    // Render tree as nested HTML
+    function renderNode(node, depth) {
+      let html = '';
+      for (const [name, child] of Object.entries(node)) {
+        if (name === FILES_KEY) continue;
+        html += `<div style="padding-left:${depth * 16}px;color:#2ecc71;">📁 ${escapeHtml(name)}/</div>`;
+        html += renderNode(child, depth + 1);
+      }
+      if (node[FILES_KEY]) {
+        for (const fname of node[FILES_KEY]) {
+          html += `<div style="padding-left:${(depth + 1) * 16}px;color:#ccc;">📄 ${escapeHtml(fname)}</div>`;
+        }
+      }
+      return html;
+    }
+
+    const rootName = files[0].webkitRelativePath.split('/')[0];
+    const rootNode = tree[rootName] || {};
+    treeContent.innerHTML = `<div style="font-weight:600;margin-bottom:4px;color:#f9ca24;">📁 ${escapeHtml(rootName)}/</div>` + renderNode(rootNode, 1);
+    treeCount.textContent = `${dirCount} folder${dirCount !== 1 ? 's' : ''}, ${fileCount} file${fileCount !== 1 ? 's' : ''}`;
+  }
+
+  async function uploadFolderContents() {
+    // Re-entrancy guard — prevent concurrent uploads
+    if (isUploadInProgress) return;
+
+    const folderInput = document.getElementById('folderInput');
+    const files = folderInput.files;
+    if (files.length === 0) return;
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    const modalClose = document.getElementById('uploadModalClose');
+
+    uploadBtn.disabled = true;
+    modalClose.classList.add('disabled');
+    isUploadInProgress = true;
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressFill.style.backgroundColor = '#27ae60';
+
+    // Step 1: Collect unique parent directories (relative to selected folder root)
+    const dirs = new Set();
+    for (const file of files) {
+      const parts = file.webkitRelativePath.split('/');
+      parts.pop(); // Remove filename
+      let dirPath = '';
+      for (const part of parts) {
+        dirPath += (dirPath ? '/' : '') + part;
+        dirs.add(dirPath);
+      }
+    }
+
+    // Step 2: Create all directories one level at a time
+    // The /mkdir endpoint expects: name=<folderName>&path=<parentDir>
+    let dirErrors = 0;
+    for (const dir of dirs) {
+      try {
+        const lastSlash = dir.lastIndexOf('/');
+        const dirName = lastSlash >= 0 ? dir.substring(lastSlash + 1) : dir;
+        const parentDir = lastSlash >= 0 ? dir.substring(0, lastSlash) : '';
+        const fullParent = currentPath + (currentPath.endsWith('/') ? '' : '/') + parentDir;
+        const res = await fetch('/mkdir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'name=' + encodeURIComponent(dirName) + '&path=' + encodeURIComponent(fullParent || '/')
+        });
+        if (!res.ok) {
+          console.warn('Failed to create directory:', dir);
+          dirErrors++;
+        }
+      } catch (e) {
+        console.warn('Network error creating directory:', dir, e);
+        dirErrors++;
+      }
+    }
+
+    // Step 3: Upload each file
+    // Path is sent as a query parameter (server reads it before multipart processing)
+    // The multipart filename is used as-is by the server — do NOT include filename in path
+    let uploaded = 0;
+    let failed = 0;
+    const total = files.length;
+
+    for (const file of files) {
+      const relPath = file.webkitRelativePath;
+      const lastSlash = relPath.lastIndexOf('/');
+      const parentDir = lastSlash >= 0 ? relPath.substring(0, lastSlash) : '';
+      const uploadPath = currentPath + (currentPath.endsWith('/') ? '' : '/') + parentDir;
+
+      progressText.textContent = `Uploading ${uploaded + 1}/${total} — ${relPath}`;
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+
+        const res = await fetch('/upload?path=' + encodeURIComponent(uploadPath), {
+          method: 'POST',
+          body: formData
+        });
+
+        if (res.ok) {
+          uploaded++;
+        } else {
+          failed++;
+          console.warn('Failed to upload:', relPath, await res.text());
+        }
+      } catch (e) {
+        failed++;
+        console.warn('Network error uploading:', relPath, e);
+      }
+
+      // Update progress after each file (after increment for accurate percentage)
+      const pct = Math.round((uploaded / total) * 100);
+      progressFill.style.width = pct + '%';
+    }
+
+    // Step 4: Completion
+    isUploadInProgress = false;
+    modalClose.classList.remove('disabled');
+    uploadBtn.disabled = false;
+    progressFill.style.width = '100%';
+
+    if (failed > 0 || dirErrors > 0) {
+      progressFill.style.backgroundColor = '#f39c12';
+      progressText.textContent = `Done — ${uploaded} uploaded, ${failed} failed` + (dirErrors > 0 ? `, ${dirErrors} dir errors` : '');
+    } else {
+      progressFill.style.backgroundColor = '#27ae60';
+      progressText.textContent = `Done — ${uploaded} file${uploaded !== 1 ? 's' : ''} uploaded successfully`;
+    }
+
+    // Close and refresh after a short delay
+    setTimeout(() => {
+      closeUploadModal();
+      window.location.reload();
+    }, 1500);
   }
 
   function updateBatchModeUI(isBatch) {
@@ -1120,6 +1366,13 @@
       div.textContent = (it.isFolder ? '📁 ' : '📄 ') + it.path;
       listEl.appendChild(div);
     });
+    // Show recursive delete checkbox only when folders are in the selection
+    const hasFolder = items.some(it => it.isFolder);
+    const recursiveDiv = document.getElementById('recursiveDeleteOption');
+    recursiveDiv.style.display = hasFolder ? 'block' : 'none';
+    if (!hasFolder) {
+      document.getElementById('recursiveDeleteCheckbox').checked = false;
+    }
     document.getElementById('deleteModal').classList.add('open');
   }
 
@@ -1149,10 +1402,14 @@
     const failed = [];
     try {
       for (const path of paths) {
+        // Check if recursive delete checkbox is checked for folders
+        const isFolderItem = deleteItemsGlobal.some(it => it.isFolder && (it.path === path || it.path === path.replace(/^\//, '')));
+        const recursive = isFolderItem && document.getElementById('recursiveDeleteCheckbox').checked;
+        const body = 'path=' + encodeURIComponent(path) + (recursive ? '&recursive=true' : '');
         const res = await fetch('/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'path=' + encodeURIComponent(path)
+          body: body
         });
         if (!res.ok) {
           const text = await res.text();
@@ -1228,7 +1485,13 @@
 
       dropZone.addEventListener('click', function(e) {
         if (uploadBusy()) return;
-        if (e.target !== fileInput) fileInput.click();
+        // Don't capture clicks on the mode buttons themselves
+        if (e.target.closest('.mode-btn')) return;
+        if (uploadMode === 'folder') {
+          document.getElementById('folderInput').click();
+        } else {
+          fileInput.click();
+        }
       });
 
       dropZone.addEventListener('dragenter', function(e) {
@@ -1252,19 +1515,34 @@
         e.preventDefault();
         dragDepth = 0;
         dropZone.classList.remove('dragover');
-
-        // Don't let a drop disrupt an in-flight transfer.
         if (uploadBusy()) return;
 
         const dropped = e.dataTransfer && e.dataTransfer.files;
         if (!dropped || dropped.length === 0) return;
 
-        // Replace the current selection, matching native file-picker semantics.
-        const dt = new DataTransfer();
-        for (const file of dropped) dt.items.add(file);
-        fileInput.files = dt.files;
+        // Detect if a folder was dropped using DataTransferItem API
+        let isFolderDrop = false;
+        if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+          const firstItem = e.dataTransfer.items[0];
+          if (firstItem.webkitGetAsEntry) {
+            const entry = firstItem.webkitGetAsEntry();
+            isFolderDrop = entry && entry.isDirectory;
+          }
+        }
 
-        validateFile();
+        if (isFolderDrop) {
+          setUploadMode('folder');
+          const dt = new DataTransfer();
+          for (const file of dropped) dt.items.add(file);
+          document.getElementById('folderInput').files = dt.files;
+          validateFolder();
+        } else {
+          setUploadMode('file');
+          const dt = new DataTransfer();
+          for (const file of dropped) dt.items.add(file);
+          fileInput.files = dt.files;
+          validateFile();
+        }
       });
     }
   })();
@@ -3352,6 +3630,10 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 }
 
 function uploadFile() {
+  // If in folder mode, use the folder upload path instead
+  if (uploadMode === 'folder') {
+    return uploadFolderContents();
+  }
   if (isUploadInProgress) return;
 
   const fileInput = document.getElementById('fileInput');
