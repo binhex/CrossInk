@@ -317,63 +317,11 @@
     setOverlap(5);
     // Update converter variables
     updateQualitySettings();
-    // Reset folder upload state
-    uploadMode = 'file';
+    // Reset upload state
     document.getElementById('folderInput').value = '';
     document.getElementById('folderTreePreview').style.display = 'none';
-    document.getElementById('fileModeBtn').classList.add('active');
-    document.getElementById('folderModeBtn').classList.remove('active');
-    document.getElementById('dropZoneHint').textContent = '⬇ Drop files here — or click to browse';
-    document.getElementById('uploadModeIndicator').innerHTML = 'Mode: <span id="uploadModeLabel">Files</span> — <span id="uploadModeSuffix">EPUB optimization available</span>';
-  }
-
-  // Upload mode state
-  let uploadMode = 'file'; // 'file' or 'folder'
-
-  function setUploadMode(mode) {
-    uploadMode = mode;
-    const fileModeBtn = document.getElementById('fileModeBtn');
-    const folderModeBtn = document.getElementById('folderModeBtn');
-    const fileInput = document.getElementById('fileInput');
-    const folderInput = document.getElementById('folderInput');
-    const dropZoneHint = document.getElementById('dropZoneHint');
-    const modeLabel = document.getElementById('uploadModeLabel');
-    const modeSuffix = document.getElementById('uploadModeSuffix');
-    const folderTreePreview = document.getElementById('folderTreePreview');
-    const convertOptions = document.getElementById('convertOptions');
-    const uploadBtn = document.getElementById('uploadBtn');
-
-    if (mode === 'file') {
-      fileModeBtn.classList.add('active');
-      folderModeBtn.classList.remove('active');
-      dropZoneHint.textContent = '⬇ Drop files here — or click to browse';
-      modeLabel.textContent = 'Files';
-      modeSuffix.textContent = 'EPUB optimization available';
-      folderTreePreview.style.display = 'none';
-      // Show EPUB optimization options when files are selected
-      if (fileInput.files.length > 0) {
-        convertOptions.style.display = 'block';
-      }
-      uploadBtn.textContent = 'Upload';
-      uploadBtn.classList.remove('optimize');
-      // Clear folder selection
-      folderInput.value = '';
-    } else {
-      folderModeBtn.classList.add('active');
-      fileModeBtn.classList.remove('active');
-      dropZoneHint.textContent = '📁 Drop a folder here — or click to browse';
-      modeLabel.textContent = 'Folder';
-      modeSuffix.textContent = 'structure will be preserved';
-      // Hide EPUB optimization for folder uploads
-      convertOptions.style.display = 'none';
-      uploadBtn.textContent = 'Upload Folder';
-      uploadBtn.classList.add('optimize');
-      // Clear file selection
-      fileInput.value = '';
-      fileInput.classList.remove('has-files');
-      clearImagePicker();
-    }
-    uploadBtn.disabled = true;
+    document.getElementById('dropZoneHint').textContent = '⬇ Drag a file or folder here — or click to browse';
+    document.getElementById('browseLinks').style.display = 'none';
   }
 
   function validateFolder() {
@@ -391,6 +339,8 @@
     renderFolderTree(files);
     folderTreePreview.style.display = 'block';
     uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload';
+    uploadBtn.classList.remove('optimize');
   }
 
   function renderFolderTree(files) {
@@ -1485,13 +1435,10 @@
 
       dropZone.addEventListener('click', function(e) {
         if (uploadBusy()) return;
-        // Don't capture clicks on the mode buttons themselves
-        if (e.target.closest('.mode-btn')) return;
-        if (uploadMode === 'folder') {
-          document.getElementById('folderInput').click();
-        } else {
-          fileInput.click();
-        }
+        // Don't capture clicks on the browse links themselves
+        if (e.target.closest('.browse-link') || e.target.closest('.browse-sep')) return;
+        // Show inline browse choices
+        document.getElementById('browseLinks').style.display = 'flex';
       });
 
       dropZone.addEventListener('dragenter', function(e) {
@@ -1531,13 +1478,11 @@
         }
 
         if (isFolderDrop) {
-          setUploadMode('folder');
           const dt = new DataTransfer();
           for (const file of dropped) dt.items.add(file);
           document.getElementById('folderInput').files = dt.files;
           validateFolder();
         } else {
-          setUploadMode('file');
           const dt = new DataTransfer();
           for (const file of dropped) dt.items.add(file);
           fileInput.files = dt.files;
@@ -3630,8 +3575,8 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 }
 
 function uploadFile() {
-  // If in folder mode, use the folder upload path instead
-  if (uploadMode === 'folder') {
+  // Auto-detect: if folder input has files, use folder upload
+  if (document.getElementById('folderInput').files.length > 0) {
     return uploadFolderContents();
   }
   if (isUploadInProgress) return;

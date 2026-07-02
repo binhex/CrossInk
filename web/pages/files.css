@@ -1424,43 +1424,29 @@ h2 {
       color: #f39c12;
     }
 
-/* Upload mode buttons inside drop zone */
-.upload-mode-buttons {
+/* Inline browse links shown on drop zone click */
+.browse-links {
   display: flex;
   gap: 8px;
   justify-content: center;
+  align-items: center;
   margin-top: 12px;
 }
-.mode-btn {
-  padding: 6px 16px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #95a5a6;
-  cursor: pointer;
-  font-size: 0.85em;
-  transition: all 0.2s;
-}
-.mode-btn:hover {
-  border-color: #777;
-  color: #ccc;
-}
-.mode-btn.active {
-  border-color: #3498db;
-  background: #3498db22;
+.browse-link {
   color: #3498db;
-  font-weight: 600;
-}
-
-/* Upload mode indicator */
-.upload-mode-indicator {
-  font-size: 0.82em;
-  color: #95a5a6;
-  text-align: center;
-  margin-bottom: 12px;
-  padding: 6px;
-  background: #1a1a1a;
+  text-decoration: none;
+  font-size: 0.85em;
+  padding: 4px 12px;
   border-radius: 4px;
+  cursor: pointer;
+}
+.browse-link:hover {
+  background: #3498db22;
+  text-decoration: underline;
+}
+.browse-sep {
+  color: #666;
+  font-size: 0.85em;
 }
 
 /* Folder tree preview */

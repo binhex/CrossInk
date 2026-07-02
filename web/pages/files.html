@@ -43,15 +43,12 @@
       <div class="drop-zone" id="dropZone">
         <input type="file" id="fileInput" onchange="validateFile()" multiple style="display:none;">
         <input type="file" id="folderInput" webkitdirectory onchange="validateFolder()" style="display:none;">
-        <p class="drop-zone-hint" id="dropZoneHint">⬇ Drop files here — or click to browse</p>
-        <div class="upload-mode-buttons">
-          <button type="button" class="mode-btn active" id="fileModeBtn" onclick="setUploadMode('file');document.getElementById('fileInput').click()">📄 Select Files</button>
-          <button type="button" class="mode-btn" id="folderModeBtn" onclick="setUploadMode('folder');document.getElementById('folderInput').click()">📁 Select Folder</button>
+        <p class="drop-zone-hint" id="dropZoneHint">⬇ Drag a file or folder here — or click to browse</p>
+        <div class="browse-links" id="browseLinks" style="display:none;">
+          <a href="#" class="browse-link" onclick="event.preventDefault();document.getElementById('fileInput').click()">📄 Browse files</a>
+          <span class="browse-sep">or</span>
+          <a href="#" class="browse-link" onclick="event.preventDefault();document.getElementById('folderInput').click()">📁 Browse folder</a>
         </div>
-      </div>
-      <!-- Upload mode indicator -->
-      <div class="upload-mode-indicator" id="uploadModeIndicator" style="display:block;">
-        Mode: <span id="uploadModeLabel">Files</span> — <span id="uploadModeSuffix">EPUB optimization available</span>
       </div>
       <!-- Folder tree preview -->
       <div class="folder-tree-preview" id="folderTreePreview" style="display:none;">
