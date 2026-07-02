@@ -356,20 +356,32 @@
     uploadBtn.classList.remove('optimize');
   }
 
-  function renderFolderTree(files) {
+  function renderFolderTree(files, getRelativePath) {
     const treeContent = document.getElementById('folderTreeContent');
     const treeCount = document.getElementById('folderTreeCount');
+
+    if (!files || files.length === 0) {
+      treeContent.innerHTML = '<div style="color:#888;">(empty folder)</div>';
+      treeCount.textContent = '0 folders, 0 files';
+      return;
+    }
+
+    // Allow caller to provide a custom path accessor;
+    // defaults to webkitRelativePath (used by <input webkitdirectory>)
+    if (!getRelativePath) {
+      getRelativePath = f => f.webkitRelativePath;
+    }
 
     // Use a distinct sentinel key to avoid collision with real directory names
     const FILES_KEY = '\x00files';
 
-    // Build a tree structure from webkitRelativePath
+    // Build a tree structure from file paths
     const tree = {};
     let fileCount = 0;
     let dirCount = 0;
 
     for (const file of files) {
-      const parts = file.webkitRelativePath.split('/');
+      const parts = getRelativePath(file).split('/');
       let node = tree;
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
@@ -403,7 +415,7 @@
       return html;
     }
 
-    const rootName = files[0].webkitRelativePath.split('/')[0];
+    const rootName = getRelativePath(files[0]).split('/')[0];
     const rootNode = tree[rootName] || {};
     treeContent.innerHTML = `<div style="font-weight:600;margin-bottom:4px;color:#f9ca24;">📁 ${escapeHtml(rootName)}/</div>` + renderNode(rootNode, 1);
     treeCount.textContent = `${dirCount} folder${dirCount !== 1 ? 's' : ''}, ${fileCount} file${fileCount !== 1 ? 's' : ''}`;
@@ -575,62 +587,6 @@
    * Render a folder tree preview from [{file, relPath}, ...] array
    * (same structure as droppedFolderFiles from walkDroppedFolder).
    */
-  function renderDroppedFolderTree(fileEntries) {
-    const treeContent = document.getElementById('folderTreeContent');
-    const treeCount = document.getElementById('folderTreeCount');
-
-    if (!fileEntries || fileEntries.length === 0) {
-      treeContent.innerHTML = '<div style="color:#888;">(empty folder)</div>';
-      treeCount.textContent = '0 folders, 0 files';
-      return;
-    }
-
-    const FILES_KEY = '\x00files';
-
-    const tree = {};
-    let fileCount = 0;
-    let dirCount = 0;
-
-    for (const entry of fileEntries) {
-      const parts = entry.relPath.split('/');
-      let node = tree;
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        if (i === parts.length - 1) {
-          if (!node[FILES_KEY]) node[FILES_KEY] = [];
-          node[FILES_KEY].push(part);
-          fileCount++;
-        } else {
-          if (!node[part]) {
-            node[part] = {};
-            dirCount++;
-          }
-          node = node[part];
-        }
-      }
-    }
-
-    function renderNode(node, depth) {
-      let html = '';
-      for (const [name, child] of Object.entries(node)) {
-        if (name === FILES_KEY) continue;
-        html += `<div style="padding-left:${depth * 16}px;color:#2ecc71;">📁 ${escapeHtml(name)}/</div>`;
-        html += renderNode(child, depth + 1);
-      }
-      if (node[FILES_KEY]) {
-        for (const fname of node[FILES_KEY]) {
-          html += `<div style="padding-left:${(depth + 1) * 16}px;color:#ccc;">📄 ${escapeHtml(fname)}</div>`;
-        }
-      }
-      return html;
-    }
-
-    const rootName = fileEntries[0].relPath.split('/')[0];
-    const rootNode = tree[rootName] || {};
-    treeContent.innerHTML = `<div style="font-weight:600;margin-bottom:4px;color:#f9ca24;">📁 ${escapeHtml(rootName)}/</div>` + renderNode(rootNode, 1);
-    treeCount.textContent = `${dirCount} folder${dirCount !== 1 ? 's' : ''}, ${fileCount} file${fileCount !== 1 ? 's' : ''}`;
-  }
-
   function updateBatchModeUI(isBatch) {
     const rotationRow = document.getElementById('rotationSettingRow');
     const overlapRow = document.getElementById('overlapSettingRow');
@@ -1609,7 +1565,7 @@
             clearImagePicker();
             document.getElementById('browseLinks').style.display = 'none';
             // Show folder tree using path data
-            renderDroppedFolderTree(droppedFolderFiles);
+            renderFolderTree(droppedFolderFiles, e => e.relPath);
             document.getElementById('folderTreePreview').style.display = 'block';
             document.getElementById('uploadBtn').disabled = false;
             document.getElementById('uploadBtn').textContent = 'Upload';
