@@ -336,6 +336,16 @@
       return;
     }
 
+    // Clear file selection state — folder and file selections are mutually exclusive
+    const fileInput = document.getElementById('fileInput');
+    fileInput.value = '';
+    fileInput.classList.remove('has-files');
+    document.getElementById('convertOptions').style.display = 'none';
+    clearImagePicker();
+
+    // Hide browse links now that folder is selected
+    document.getElementById('browseLinks').style.display = 'none';
+
     renderFolderTree(files);
     folderTreePreview.style.display = 'block';
     uploadBtn.disabled = false;
@@ -1497,6 +1507,14 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const files = fileInput.files;
     const convertOptions = document.getElementById('convertOptions');
+
+    // Clear folder selection state — folder and file selections are mutually exclusive
+    document.getElementById('folderInput').value = '';
+    document.getElementById('folderTreePreview').style.display = 'none';
+
+    // Hide browse links now that files are selected
+    document.getElementById('browseLinks').style.display = 'none';
+
     fileInput.classList.toggle('has-files', files.length > 0);
 
     // Show convert options only when at least one selected file is an EPUB.
