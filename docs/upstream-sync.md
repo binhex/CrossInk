@@ -4,7 +4,20 @@ This fork tracks [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk) via the
 `upstream-main` branch. The tracking branch was set up when merging v1.4.0 and
 persists on `origin` so it's available for future updates.
 
+## Initial setup (already done on this repo)
+
+If cloning this fork fresh on a new machine, run these once:
+
+```bash
+git remote add upstream https://github.com/uxjulia/CrossInk
+git fetch upstream --tags
+git branch upstream-main upstream/main
+git push origin upstream-main
+```
+
 ## To merge a future upstream release
+
+With the upstream remote and `upstream-main` branch already set up:
 
 ```bash
 # 1. Fetch latest upstream changes and tags
@@ -27,7 +40,7 @@ git merge upstream-main
 | Area | Files | Strategy |
 |------|-------|----------|
 | Web file manager | `web/pages/files.html`, `web/pages/files.js` | Keep fork's version (`git checkout --ours <file>`) |
-| CI workflow | `.github/workflows/build-firmware-fork.yml` | Keep fork's version (`git checkout --ours <file>`) |
+| CI workflow | `.github/workflows/build-firmware.yml` | Keep fork's version (`git checkout --ours <file>`) |
 | README | `README.md` | Auto-merged; keep upstream unless fork section conflicts |
 | Everything else | Upstream firmware code | Accept upstream (`git checkout --theirs <file>`) |
 
@@ -49,19 +62,8 @@ python3 scripts/build_web.py
 git push origin main --tags
 ```
 
-The CI workflow (`.github/workflows/build-firmware-fork.yml`) will automatically
+The CI workflow (`.github/workflows/build-firmware.yml`) will automatically
 build on push to `main` and upload firmware artifacts.
-
-## Initial setup (already done)
-
-If cloning this fork fresh on a new machine:
-
-```bash
-git remote add upstream https://github.com/uxjulia/CrossInk
-git fetch upstream --tags
-git branch upstream-main upstream/main
-git push origin upstream-main
-```
 
 ## Remotes reference
 
